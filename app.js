@@ -7,9 +7,11 @@ import multer from "multer";
 import multerS3 from "multer-s3";
 import { nanoid } from "nanoid";
 import cors from "cors";
+import mysql from "mysql";
 
 const app = express();
 
+// 이미지 저장을 위한 object storage 연동
 const s3 = new AWS.S3({
   credentials: {
     accessKeyId: process.env.NCLOUD_ACCESS_KEY,
@@ -20,6 +22,16 @@ const s3 = new AWS.S3({
   s3ForcePathStyle: true,
   signatureVersion: "v4",
 });
+
+// 데이터 저장을 위한 mysql 연결
+const connection = mysql.createConnection({
+  host: process.env.MYSQL_HOST,
+  user: process.env.MYSQL_USER,
+  password: process.env.MYSQL_PASSWORD,
+  database: process.env.MYSQL_DATABASE
+})
+
+connection.connect();
 
 const upload = multer({
   storage: multerS3({
