@@ -42,7 +42,6 @@ const upload = multer({
       const fileId = nanoid();
       const type = file.mimetype.split("/")[1];
       const fileName = `${fileId}.${type}`;
-      console.log(fileName);
       cb(null, fileName);
     },
     acl: "public-read", // 업로드된 파일의 접근 권한 설정
@@ -57,17 +56,21 @@ app.get("/", (req, res) => {
   res.send("Hello, Express");
 });
 
-// 파일 업로드 엔드포인트
-app.post("/image", upload.single("image"), async (req, res) => {
-  try {
-    console.log("res", res);
-    res.status(200).json({
-      message: "File uploaded successfully!",
-      fileLocation: req.file.location, // S3에 저장된 파일의 URL
-    });
-  } catch (error) {
-    return res.status(400).send("No file uploaded.");
-  }
+// 추억 보내기(저장하기)
+app.post("/memory", upload.single("image"), (req, res) => {
+  const nickname = req.body.nickname;
+  const imageUrl = req.file.location;
+  const message = req.body.message;
+  const location = req.body.location;
+  const size = req.body.size;
+
+  const sql = 'INSERT INTO memory (nickname, image_url, message, location, size) VALUES (?, ?, ?, ?, ?)';
+  connection.query(sql, [nickname, imageUrl, message, location, size], (err, result) => {
+    if(err) {
+      return res.status(500).json({msg: 'Database error', error: err});
+    }
+    res.status(201).json({msg: 'Memory added'});
+  });
 });
 
 app.listen(app.get("port"), () => {
