@@ -73,6 +73,39 @@ app.post("/memory", upload.single("image"), (req, res) => {
   });
 });
 
+app.get("/memory", async(req, res) => {
+  const {cursorCreatedAt, cursorId, limit = 10} = req.query;
+
+  let sql = `SELECT * FROM memory`;
+  let params = [];
+  
+  if (cursorCreatedAt && cursorId) {
+    sql += ` WHERE (created_at = ? AND id < ?)`;
+    params.push(cursorCreatedAt, cursorId); 
+  }
+
+  sql += ` ORDER BY created_at DESC, id DESC LIMIT ?`;
+  params.push(parseInt(limit));
+
+
+  db.query(sql, params, (error, results) => {
+    if (error) {
+      console.error(error);
+      return res.status(500).send('Database error');
+    }
+       
+    const nextCursor = results.length ? {
+      createdAt: results[results.length - 1].created_at, 
+      id: results[results.length - 1].id
+    } : null;
+
+    res.json({
+      items: results,
+      nextCursor    
+    });
+  });
+});
+
 app.listen(app.get("port"), () => {
   console.log(app.get("port"), "번 포트에서 대기 중");
 });
