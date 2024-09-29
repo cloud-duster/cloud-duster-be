@@ -57,7 +57,7 @@ app.get("/", (req, res) => {
 });
 
 // 추억 보내기(저장하기)
-app.post("/memory", upload.single("image"), (req, res) => {
+app.post("/memories", upload.single("image"), (req, res) => {
   const nickname = req.body.nickname;
   const imageUrl = req.file.location;
   const message = req.body.message;
