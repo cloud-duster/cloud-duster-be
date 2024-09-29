@@ -57,7 +57,7 @@ app.get("/", (req, res) => {
 });
 
 // 추억 보내기(저장하기)
-app.post("/memories", upload.single("image"), (req, res) => {
+app.post("/memory", upload.single("image"), (req, res) => {
   const nickname = req.body.nickname;
   const imageUrl = req.file.location;
   const message = req.body.message;
@@ -73,7 +73,7 @@ app.post("/memories", upload.single("image"), (req, res) => {
   });
 });
 
-app.get("/memory", async(req, res) => {
+app.get("/memories", async(req, res) => {
   const {cursorCreatedAt, cursorId, limit = 10} = req.query;
 
   let sql = `SELECT * FROM memory`;
@@ -102,6 +102,22 @@ app.get("/memory", async(req, res) => {
     res.json({
       items: results,
       nextCursor    
+    });
+  });
+});
+
+app.get("/memories/:id", (req, res) => {
+  const id = req.params.id;
+
+  const sql = 'SELECT * FROM memory WHERE id = ?';
+  db.query(sql, [parseInt(id)], (error, result) => {
+    if (error) {
+      console.error(error);
+      return res.status(500).send('Database error');
+    }
+
+    res.json({
+      result
     });
   });
 });
