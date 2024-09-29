@@ -106,6 +106,22 @@ app.get("/memories", async(req, res) => {
   });
 });
 
+app.get("/memories/:id", (req, res) => {
+  const id = req.params.id;
+
+  const sql = 'SELECT * FROM memory WHERE id = ?';
+  db.query(sql, [parseInt(id)], (error, result) => {
+    if (error) {
+      console.error(error);
+      return res.status(500).send('Database error');
+    }
+
+    res.json({
+      result
+    });
+  });
+});
+
 app.listen(app.get("port"), () => {
   console.log(app.get("port"), "번 포트에서 대기 중");
 });
