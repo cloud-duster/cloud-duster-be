@@ -24,14 +24,14 @@ const s3 = new AWS.S3({
 });
 
 // 데이터 저장을 위한 mysql 연결
-const connection = mysql.createConnection({
+const db = mysql.createConnection({
   host: process.env.MYSQL_HOST,
   user: process.env.MYSQL_USER,
   password: process.env.MYSQL_PASSWORD,
   database: process.env.MYSQL_DATABASE
 })
 
-connection.connect();
+db.connect();
 
 const upload = multer({
   storage: multerS3({
@@ -65,7 +65,7 @@ app.post("/memory", upload.single("image"), (req, res) => {
   const size = req.body.size;
 
   const sql = 'INSERT INTO memory (nickname, image_url, message, location, size) VALUES (?, ?, ?, ?, ?)';
-  connection.query(sql, [nickname, imageUrl, message, location, size], (err, result) => {
+  db.query(sql, [nickname, imageUrl, message, location, size], (err) => {
     if(err) {
       return res.status(500).json({msg: 'Database error', error: err});
     }
