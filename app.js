@@ -31,7 +31,25 @@ const db = mysql.createConnection({
   database: process.env.MYSQL_DATABASE
 })
 
-db.connect();
+db.connect(err => {
+  if (err) {
+    console.error('Error connectiong to the database: ', err);
+    return;
+  }
+  console.log('Connected to the MySQL server.');
+});
+
+// TODO: 시간은 점점 늘려가서 적절한 시간을 찾을 것
+// 주기적으로 dummy query 실행(예시: 10분마다) 
+setInterval(() => {
+  createConnection.query('SELECT 1', (err, results) => {
+    if (err) {
+      console.error('Error sending keep-alive query: ', err);
+    } else {
+      console.log('Keep-alive query successful: ', results);
+    }
+  });
+}, 600000); // 600000 밀리초 = 10분
 
 const upload = multer({
   storage: multerS3({
