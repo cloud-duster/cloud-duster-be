@@ -42,7 +42,7 @@ db.connect(err => {
 // TODO: 시간은 점점 늘려가서 적절한 시간을 찾을 것
 // 주기적으로 dummy query 실행(예시: 10분마다) 
 setInterval(() => {
-  createConnection.query('SELECT 1', (err, results) => {
+  db.query('SELECT 1', (err, results) => {
     if (err) {
       console.error('Error sending keep-alive query: ', err);
     } else {
@@ -91,20 +91,33 @@ app.post("/memory", upload.single("image"), (req, res) => {
   });
 });
 
+// 모든 추억 불러오기
 app.get("/memories", async(req, res) => {
-  const {cursorCreatedAt, cursorId, limit = 10} = req.query;
+  const {location, cursorCreatedAt, cursorId, limit = 10} = req.query;
 
   let sql = `SELECT * FROM memory`;
   let params = [];
   
-  if (cursorCreatedAt && cursorId) {
-    sql += ` WHERE (created_at = ? AND id < ?)`;
-    params.push(cursorCreatedAt, cursorId); 
+  if (location) {
+    console.log("location: ", location)
+    if (cursorCreatedAt && cursorId) {
+      sql += ` WHERE (created_at = ? AND id < ?)`;
+      params.push(cursorCreatedAt, cursorId); 
+    }
+  
+    sql += ` WHERE location = ? ORDER BY created_at DESC, id DESC LIMIT ?`;
+    params.push(location, parseInt(limit));    
   }
 
-  sql += ` ORDER BY created_at DESC, id DESC LIMIT ?`;
-  params.push(parseInt(limit));
+  else {
+    if (cursorCreatedAt && cursorId) {
+      sql += ` WHERE (created_at = ? AND id < ?)`;
+      params.push(cursorCreatedAt, cursorId); 
+    }
 
+    sql += ` ORDER BY created_at DESC, id DESC LIMIT ?`;
+    params.push(parseInt(limit));
+  }
 
   db.query(sql, params, (error, results) => {
     if (error) {
@@ -124,6 +137,7 @@ app.get("/memories", async(req, res) => {
   });
 });
 
+// 개별 추억 불러오기
 app.get("/memories/:id", (req, res) => {
   const id = req.params.id;
 
