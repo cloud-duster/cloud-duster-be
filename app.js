@@ -93,19 +93,31 @@ app.post("/memory", upload.single("image"), (req, res) => {
 
 // 모든 추억 불러오기
 app.get("/memories", async(req, res) => {
-  const {cursorCreatedAt, cursorId, limit = 10} = req.query;
+  const {location, cursorCreatedAt, cursorId, limit = 10} = req.query;
 
   let sql = `SELECT * FROM memory`;
   let params = [];
   
-  if (cursorCreatedAt && cursorId) {
-    sql += ` WHERE (created_at = ? AND id < ?)`;
-    params.push(cursorCreatedAt, cursorId); 
+  if (location) {
+    console.log("location: ", location)
+    if (cursorCreatedAt && cursorId) {
+      sql += ` WHERE (created_at = ? AND id < ?)`;
+      params.push(cursorCreatedAt, cursorId); 
+    }
+  
+    sql += ` WHERE location = ? ORDER BY created_at DESC, id DESC LIMIT ?`;
+    params.push(location, parseInt(limit));    
   }
 
-  sql += ` ORDER BY created_at DESC, id DESC LIMIT ?`;
-  params.push(parseInt(limit));
+  else {
+    if (cursorCreatedAt && cursorId) {
+      sql += ` WHERE (created_at = ? AND id < ?)`;
+      params.push(cursorCreatedAt, cursorId); 
+    }
 
+    sql += ` ORDER BY created_at DESC, id DESC LIMIT ?`;
+    params.push(parseInt(limit));
+  }
 
   db.query(sql, params, (error, results) => {
     if (error) {
