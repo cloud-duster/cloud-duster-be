@@ -42,7 +42,7 @@ db.connect(err => {
 // TODO: 시간은 점점 늘려가서 적절한 시간을 찾을 것
 // 주기적으로 dummy query 실행(예시: 10분마다) 
 setInterval(() => {
-  createConnection.query('SELECT 1', (err, results) => {
+  db.query('SELECT 1', (err, results) => {
     if (err) {
       console.error('Error sending keep-alive query: ', err);
     } else {
