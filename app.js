@@ -91,6 +91,7 @@ app.post("/memory", upload.single("image"), (req, res) => {
   });
 });
 
+// 모든 추억 불러오기
 app.get("/memories", async(req, res) => {
   const {cursorCreatedAt, cursorId, limit = 10} = req.query;
 
@@ -124,6 +125,7 @@ app.get("/memories", async(req, res) => {
   });
 });
 
+// 개별 추억 불러오기
 app.get("/memories/:id", (req, res) => {
   const id = req.params.id;
 
