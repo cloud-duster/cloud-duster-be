@@ -8,6 +8,7 @@ import multerS3 from "multer-s3";
 import { nanoid } from "nanoid";
 import cors from "cors";
 import mysql from "mysql";
+import heicConvert from "heic-convert";
 
 const app = express();
 
@@ -82,6 +83,15 @@ app.post("/memory", upload.single("image"), (req, res) => {
   const location = req.body.location;
   const size = req.body.size;
 
+    if (type === 'png' || type === 'jpeg' || type === 'jpg') imageBuffer = req.file.buffer;
+    else {
+      console.log("heic")
+      imageBuffer = await heicConvert({
+        buffer: req.file.buffer,
+        format: 'JPEG',
+        quality: 0.8  // JPEG 품질 조정
+      });      
+    }
   const sql = 'INSERT INTO memory (nickname, image_url, message, location, size) VALUES (?, ?, ?, ?, ?)';
   db.query(sql, [nickname, imageUrl, message, location, size], (err) => {
     if(err) {
