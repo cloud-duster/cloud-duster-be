@@ -13,7 +13,6 @@ import heicConvert from "heic-convert";
 const app = express();
 
 // 이미지 저장을 위한 object storage 연동
-// const s3 = new AWS.S3({
 const s3 = new S3Client({
   credentials: {
     accessKeyId: process.env.NCLOUD_ACCESS_KEY,
@@ -129,7 +128,7 @@ app.post("/memory", upload.single("image"), async (req, res) => {
 
 // 모든 추억 불러오기
 app.get("/memories", async(req, res) => {
-  const {location, date, cursorCreatedAt, cursorId, limit = 10} = req.query;
+  const {location, date, cursorId, limit = 10} = req.query;
 
   let sql = `SELECT * FROM memory WHERE 1=1`; // 기본적으로 true인 조건 추가
   let params = [];
@@ -149,17 +148,17 @@ app.get("/memories", async(req, res) => {
     params.push(location);
   } 
 
-  if (cursorCreatedAt && cursorId) {
-    sql += ` WHERE (created_at = ? AND id < ?)`;
-    params.push(cursorCreatedAt, cursorId); 
+  if (cursorId) {
+    sql += ` AND id < ?`;
+    params.push(parseInt(cursorId));
   }
 
-  sql += ` ORDER BY created_at DESC, id DESC LIMIT ?`;
+  sql += ` ORDER BY created_at DESC, id DESC LIMIT ?;`;
   params.push(parseInt(limit));
 
   db.query(sql, params, (error, results) => {
     if (error) {
-      return res.status(500).send('Database error');
+      return res.status(500).json({msg: 'Database error', error: error.message});
     }
        
     const nextCursor = results.length ? {
@@ -169,7 +168,7 @@ app.get("/memories", async(req, res) => {
 
     res.json({
       items: results,
-      nextCursor    
+      nextCursor
     });
   });
 });
