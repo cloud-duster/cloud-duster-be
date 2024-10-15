@@ -56,6 +56,8 @@ setInterval(() => {
 }, 600000); // 600000 밀리초 = 10분
 
 app.use(cors());
+app.use(express.json());
+app.use(express.urlencoded({extended: true}));
 
 app.set("port", process.env.PORT || 3000);
 
@@ -65,9 +67,7 @@ app.get("/", (req, res) => {
 
 // 추억 보내기(저장하기)
 app.post("/memory", upload.single("image"), async (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({msg: 'No file uploaded'}); 
-  }
+  const getQuery = 'SELECT people_involved_count, total_photo_size AS total_people_involved, total_photo_size FROM cloud_cleanup_summary WHERE id = 1';
 
   const nickname = req.body.nickname;
   const message = req.body.message;
@@ -78,12 +78,36 @@ app.post("/memory", upload.single("image"), async (req, res) => {
   const type = req.file.mimetype.split("/")[1];
   const fileName = `${fileId}.${type}`;
 
+  db.query(getQuery, (err, results) => {
+    if (err) {
+      return res.status(500).send('서버 오류');
+    }
+
+    let peopleInvolvedCount = Number(results[0].total_people_involved);
+    let totalPhotoSize = Number(results[0].total_photo_size);
+    peopleInvolvedCount += 1;
+    totalPhotoSize += size;
+
+    // 누적된 값을 다음 테이블에 저장하는 쿼리
+    const updateQuery = 'UPDATE cloud_cleanup_summary SET people_involved_count = ?, total_photo_size = ? WHERE id = 1'; // id 기준으로 업데이트
+
+    db.query(updateQuery, [peopleInvolvedCount, totalPhotoSize], (err, updateResult) => {
+      if(err) {
+        console.error('업데이트 실패: ', err);
+        return res.status(500).send('서버 오류');
+      }
+    });
+  });  
+
+  if (!req.file) {
+    return res.status(400).json({msg: 'No file uploaded'}); 
+  }
+
   try {
     let imageBuffer;
 
     if (type === 'png' || type === 'jpeg' || type === 'jpg') imageBuffer = req.file.buffer;
     else {
-      console.log("heic")
       imageBuffer = await heicConvert({
         buffer: req.file.buffer,
         format: 'JPEG',
@@ -188,6 +212,58 @@ app.get("/memories/:id", (req, res) => {
       result
     });
   });
+});
+
+// 지운 사진 개수
+app.post("/update-photos-deleted-total", (req, res) => {
+  const getQuery = 'SELECT photos_deleted_count AS total_photos_deleted FROM cloud_cleanup_summary WHERE id = 1';
+  const imageCount = req.body.count;
+
+  db.query(getQuery, (err, results) => {
+    if (err) {
+      return res.status(500).send('서버 오류');
+    }
+
+    // 누적된 totalPhotosDeleted 값을 가져옴
+    let totalPhotosDeleted = Number(results[0].total_photos_deleted);
+    totalPhotosDeleted += imageCount;
+
+    // 누적된 값을 다음 테이블에 저장하는 쿼리
+    const updateQuery = 'UPDATE cloud_cleanup_summary SET photos_deleted_count = ? WHERE id = 1'; // id 기준으로 업데이트
+
+    db.query(updateQuery, [totalPhotosDeleted], (err, updateResult) => {
+      if(err) {
+        console.error('업데이트 실패: ', err);
+        return res.status(500).send('서버 오류');
+      }
+
+      res.json({message: '누적된 photos_deleted_count 저장 완료', totalPhotosDeleted});
+    });
+  });
+});
+
+// 먼지 요약 정보 불러오기
+app.get("/cloud-cleanup-summary", async(req, res) => {
+  const sql = `SELECT * FROM cloud_cleanup_summary WHERE id = 1`; // 기본적으로 true인 조건 추가
+
+  db.query(sql, (err, results) => {
+    if (err) {
+      console.error('쿼리 실패: ', err);
+      return res.status(500).send('서버 error');
+    }
+
+    const deletedPhotoCount = results[0].photos_deleted_count;
+    const peopleCount = results[0].people_involved_count;
+    const avgPhotoSize = results[0].total_photo_size / deletedPhotoCount;
+        
+    return res.json(
+      {
+        "deletedPhotoCount": deletedPhotoCount,
+        "peopleCount": peopleCount,
+        "avgPhotoSize": avgPhotoSize
+      }
+    )
+  })
 });
 
 app.listen(app.get("port"), () => {
