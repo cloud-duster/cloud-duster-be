@@ -192,6 +192,35 @@ app.get("/memories/:id", (req, res) => {
   });
 });
 
+// 지운 사진 개수
+app.post("/update-photos-deleted-total", (req, res) => {
+  const sumQuery = 'SELECT photos_deleted_count AS total_photos_deleted FROM cloud_cleanup_summary WHERE id = 1';
+  const imageCount = req.body.count;
+
+  db.query(sumQuery, (err, results) => {
+    if (err) {
+      return res.status(500).send('서버 오류');
+    }
+
+    // 누적된 totalPhotosDeleted 값을 가져옴
+    let totalPhotosDeleted = Number(results[0].total_photos_deleted);
+    totalPhotosDeleted += imageCount;
+
+    // 누적된 값을 다음 테이블에 저장하는 쿼리
+    const updateQuery = 'UPDATE cloud_cleanup_summary SET photos_deleted_count = ? WHERE id = 1'; // id 기준으로 업데이트
+    const someId = 1; // 업데이트할 row의 id 값을 맞춰서 설정해야 함
+
+    db.query(updateQuery, [totalPhotosDeleted], (err, updateResult) => {
+      if(err) {
+        console.error('업데이트 실패: ', err);
+        return res.status(500).send('서버 오류');
+      }
+
+      res.json({message: '누적된 photos_deleted_count 저장 완료', totalPhotosDeleted});
+    });
+  });
+});
+
 app.listen(app.get("port"), () => {
   console.log(app.get("port"), "번 포트에서 대기 중");
 });
