@@ -67,9 +67,7 @@ app.get("/", (req, res) => {
 
 // 추억 보내기(저장하기)
 app.post("/memory", upload.single("image"), async (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({msg: 'No file uploaded'}); 
-  }
+  const getQuery = 'SELECT people_involved_count, total_photo_size AS total_people_involved, total_photo_size FROM cloud_cleanup_summary WHERE id = 1';
 
   const nickname = req.body.nickname;
   const message = req.body.message;
@@ -79,6 +77,31 @@ app.post("/memory", upload.single("image"), async (req, res) => {
   const fileId = nanoid();
   const type = req.file.mimetype.split("/")[1];
   const fileName = `${fileId}.${type}`;
+
+  db.query(getQuery, (err, results) => {
+    if (err) {
+      return res.status(500).send('서버 오류');
+    }
+
+    let peopleInvolvedCount = Number(results[0].total_people_involved);
+    let totalPhotoSize = Number(results[0].total_photo_size);
+    peopleInvolvedCount += 1;
+    totalPhotoSize += size;
+
+    // 누적된 값을 다음 테이블에 저장하는 쿼리
+    const updateQuery = 'UPDATE cloud_cleanup_summary SET people_involved_count = ?, total_photo_size = ? WHERE id = 1'; // id 기준으로 업데이트
+
+    db.query(updateQuery, [peopleInvolvedCount, totalPhotoSize], (err, updateResult) => {
+      if(err) {
+        console.error('업데이트 실패: ', err);
+        return res.status(500).send('서버 오류');
+      }
+    });
+  });  
+
+  if (!req.file) {
+    return res.status(400).json({msg: 'No file uploaded'}); 
+  }
 
   try {
     let imageBuffer;
