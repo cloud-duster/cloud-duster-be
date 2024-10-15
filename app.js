@@ -221,6 +221,30 @@ app.post("/update-photos-deleted-total", (req, res) => {
   });
 });
 
+// 먼지 요약 정보 불러오기
+app.get("/cloud-cleanup-summary", async(req, res) => {
+  const sql = `SELECT * FROM cloud_cleanup_summary WHERE id = 1`; // 기본적으로 true인 조건 추가
+
+  db.query(sql, (err, results) => {
+    if (err) {
+      console.error('쿼리 실패: ', err);
+      return res.status(500).send('서버 error');
+    }
+
+    const deletedPhotoCount = results[0].photos_deleted_count;
+    const peopleCount = results[0].people_involved_count;
+    const avgPhotoSize = results[0].total_photo_size / deletedPhotoCount;
+        
+    return res.json(
+      {
+        "deletedPhotoCount": deletedPhotoCount,
+        "peopleCount": peopleCount,
+        "avgPhotoSize": avgPhotoSize
+      }
+    )
+  })
+});
+
 app.listen(app.get("port"), () => {
   console.log(app.get("port"), "번 포트에서 대기 중");
 });
