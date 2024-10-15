@@ -56,6 +56,8 @@ setInterval(() => {
 }, 600000); // 600000 밀리초 = 10분
 
 app.use(cors());
+app.use(express.json());
+app.use(express.urlencoded({extended: true}));
 
 app.set("port", process.env.PORT || 3000);
 
