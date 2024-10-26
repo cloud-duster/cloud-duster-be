@@ -260,7 +260,8 @@ app.get("/cloud-cleanup-summary", async(req, res) => {
       {
         "deletedPhotoCount": deletedPhotoCount,
         "peopleCount": peopleCount,
-        "avgPhotoSize": avgPhotoSize
+        "avgPhotoSize": avgPhotoSize,
+        "totalPhotoSize": results[0].total_photo_size
       }
     )
   })
