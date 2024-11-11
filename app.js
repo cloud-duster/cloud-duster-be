@@ -1,13 +1,13 @@
 import dotenv from "dotenv";
 dotenv.config();
 
-import express from "express";
 import AWS from "@aws-sdk/client-s3";
+import cors from "cors";
+import express from "express";
 import multer from "multer";
 import multerS3 from "multer-s3";
-import { nanoid } from "nanoid";
-import cors from "cors";
 import mysql from "mysql";
+import { nanoid } from "nanoid";
 
 const app = express();
 
@@ -49,7 +49,7 @@ const upload = multer({
   }),
 });
 
-app.use(cors());
+app.use(cors({ origin: '*' }));
 
 app.set("port", process.env.PORT || 3000);
 
