@@ -9,6 +9,8 @@ import cors from "cors";
 import mysql from "mysql";
 import sharp from "sharp";
 import heicConvert from "heic-convert";
+import schedule from "node-schedule";
+import { resolve } from "path";
 
 const app = express();
 
@@ -138,8 +140,11 @@ app.post("/memory", upload.single("image"), async (req, res) => {
       Body: compressedImageBuffer,
       ContentType: "image/jpeg",
       ACL: "public-read",
+      ContentType: "image/jpeg",
+      ACL: "public-read",
     };
     const command = new PutObjectCommand(uploadParams);
+    await s3.send(command);
     await s3.send(command);
 
     const imageUrl = `https://${process.env.NCLOUD_BUCKET_NAME}.kr.object.ncloudstorage.com/${fileName}`;
@@ -271,12 +276,32 @@ app.get("/cloud-cleanup-summary", async(req, res) => {
       {
         "deletedPhotoCount": deletedPhotoCount,
         "peopleCount": peopleCount,
-        "avgPhotoSize": avgPhotoSize
+        "avgPhotoSize": avgPhotoSize,
+        "totalPhotoSize": results[0].total_photo_size
       }
     )
   })
 });
 
 app.listen(app.get("port"), () => {
-  console.log(app.get("port"), "번 포트에서 대기 중");
+  // console.log(app.get("port"), "번 포트에서 대기 중");
+  schedule.scheduleJob('0 0 * * *', function() {
+    console.log('3일 전 데이터 삭제 작업 시작')
+    
+    // 3일 전 날짜 계산
+    const threeDaysAgo = new Date();
+    threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+    const formattedDate = threeDaysAgo.toISOString().slice(0, 10);  // YYYY-MM-DD 형식으로 변환
+
+    // 3일 전 데이터 삭제 쿼리
+    const query = `DELETE FROM memory WHERE created_at < ?`;
+    db.query(query, [formattedDate], (err, result) => {
+      if(err) {
+        console.error('데이터 삭제 중 오류 발생: ', err);
+      } else {
+        console.log(`3일 전 데이터 삭제 완료. 삭제된 행 수: ${result.affectedRows}`);
+      }
+    })
+  }
+  )
 });
