@@ -74,79 +74,91 @@ app.post("/memory", upload.single("image"), async (req, res) => {
   const location = req.body.location;
   const size = req.body.size;
 
-  const fileId = nanoid();
-  const type = req.file.mimetype.split("/")[1];
-  const fileName = `${fileId}.${type}`;
-
-  db.query(getQuery, (err, results) => {
-    if (err) {
-      return res.status(500).send('서버 오류');
-    }
-
-    let peopleInvolvedCount = Number(results[0].total_people_involved);
-    let totalPhotoSize = Number(results[0].total_photo_size);
-    peopleInvolvedCount += 1;
-    totalPhotoSize += size;
-
-    // 누적된 값을 다음 테이블에 저장하는 쿼리
-    const updateQuery = 'UPDATE cloud_cleanup_summary SET people_involved_count = ?, total_photo_size = ? WHERE id = 1'; // id 기준으로 업데이트
-
-    db.query(updateQuery, [peopleInvolvedCount, totalPhotoSize], (err, updateResult) => {
-      if(err) {
-        console.error('업데이트 실패: ', err);
-        return res.status(500).send('서버 오류');
-      }
-    });
-  });  
-
   if (!req.file) {
     return res.status(400).json({msg: 'No file uploaded'}); 
   }
 
-  try {
-    let imageBuffer;
+  const fileId = nanoid();
+  const type = req.file.mimetype.split("/")[1];
+  const fileName = `${fileId}.${type}`;
 
-    if (type === 'png' || type === 'jpeg' || type === 'jpg') imageBuffer = req.file.buffer;
-    else {
+  try {
+    const [results] = await new Promise((resolve, reject) => {
+      db.query(getQuery, (err, results) => {
+        if (err) reject(err);
+        else resolve(results);
+      });
+    });
+
+    console.log("results: ", results)
+    
+    // if (!results.length) {
+    //   return res.status(404).json({msg: "Summary not found"});
+    // }
+
+    let {people_involved_count, total_photo_size} = results;
+    console.log("people_involved_count: ", people_involved_count)
+    console.log("total_photo_size: ", total_photo_size);
+    people_involved_count += 1;
+    total_photo_size += Number(size);
+
+    // 2. 데이터베이스 업데이트
+    console.log("2. 데이터베이스 업데이트")
+    const updateQuery = "UPDATE cloud_cleanup_summary SET people_involved_count = ?, total_photo_size = ? WHERE id = 1"
+    await new Promise((resolve, reject) => {
+      db.query(updateQuery, [people_involved_count, total_photo_size], (err) => {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
+
+    // 3. 이미지 변환 및 압축
+    console.log("3. 이미지 변환 및 압축")
+    let imageBuffer;
+    if (type === "png" || type === "jpeg" || type === "jpg") {
+      imageBuffer = req.file.buffer;
+    } else {
       imageBuffer = await heicConvert({
         buffer: req.file.buffer,
-        format: 'JPEG',
-        quality: 0.8  // JPEG 품질 조정
-      });      
+        format: "JPEG",
+        quality: 0.8,
+      });
     }
 
-    // Sharp로 이미지 크기 줄이기 및 압축
-    // await를 사용하여, 이미지가 처리될 때까지 기다림 
     const compressedImageBuffer = await sharp(imageBuffer)
-      .resize(800) // 이미지 너비 800px로 조정
-      .jpeg({quality: 80})  // JPEG 포맷으로 압축
+      .resize(800)
+      .jpeg({ quality: 80 })
       .toBuffer();
-    
-    // S3에 업로드하기 위한 파라미터 설정
+
+    // 4. S3 업로드
+    console.log("4. S3 업로드")
     const uploadParams = {
       Bucket: process.env.NCLOUD_BUCKET_NAME,
       Key: fileName,
       Body: compressedImageBuffer,
-      ContentType: 'JPEG',
-      ACL: "public-read", // 업로드된 파일의 접근 권한 설정
+      ContentType: "image/jpeg",
+      ACL: "public-read",
     };
-
     const command = new PutObjectCommand(uploadParams);
+    await s3.send(command);
 
-    // 업로드 진행
-    const data = await s3.send(command);
+    const imageUrl = `https://${process.env.NCLOUD_BUCKET_NAME}.kr.object.ncloudstorage.com/${fileName}`;
 
-    const imageUrl = `https://${process.env.NCLOUD_BUCKET_NAME}.kr.object.ncloudstorage.com/${fileName}`
-
-    const sql = 'INSERT INTO memory (nickname, image_url, message, location, size) VALUES (?, ?, ?, ?, ?)';
-    db.query(sql, [nickname, imageUrl, message, location, size], (err) => {
-      if(err) {
-        return res.status(500).json({msg: 'Database error', error: err});
-      }
-      res.status(201).json({msg: 'Memory added'});
+    // 5. 데이터베이스에 새로운 메모리 저장
+    console.log("5. 데이터베이스에 새로운 메모리 저장")
+    const sql = "INSERT INTO memory (nickname, image_url, message, location, size) VALUES (?, ?, ?, ?, ?)";
+    await new Promise((resolve, reject) => {
+      db.query(sql, [nickname, imageUrl, message, location, size], (err) => {
+        if (err) reject(err);
+        else resolve();
+      });
     });
-  } catch (error) {
-    return res.status(500).json({msg: 'Error uploading image to S3', error: error.message}) 
+
+    // 최종 응답
+    res.status(201).json({msg: "Memory added"});
+  } catch(error) {
+    console.error("Error: ", error.message);
+    res.status(500).json({msg: "Internal server error", error: error.message});
   }
 });
 
@@ -248,8 +260,7 @@ app.get("/cloud-cleanup-summary", async(req, res) => {
 
   db.query(sql, (err, results) => {
     if (err) {
-      console.error('쿼리 실패: ', err);
-      return res.status(500).send('서버 error');
+      return res.status(500).send('서버 에러');
     }
 
     const deletedPhotoCount = results[0].photos_deleted_count;
