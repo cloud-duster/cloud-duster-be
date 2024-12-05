@@ -92,20 +92,20 @@ app.post("/memory", upload.single("image"), async (req, res) => {
       });
     });
 
-    console.log("results: ", results)
+    // console.log("results: ", results)
     
     // if (!results.length) {
     //   return res.status(404).json({msg: "Summary not found"});
     // }
 
     let {people_involved_count, total_photo_size} = results;
-    console.log("people_involved_count: ", people_involved_count)
-    console.log("total_photo_size: ", total_photo_size);
+    // console.log("people_involved_count: ", people_involved_count)
+    // console.log("total_photo_size: ", total_photo_size);
     people_involved_count += 1;
     total_photo_size += Number(size);
 
     // 2. 데이터베이스 업데이트
-    console.log("2. 데이터베이스 업데이트")
+    // console.log("2. 데이터베이스 업데이트")
     const updateQuery = "UPDATE cloud_cleanup_summary SET people_involved_count = ?, total_photo_size = ? WHERE id = 1"
     await new Promise((resolve, reject) => {
       db.query(updateQuery, [people_involved_count, total_photo_size], (err) => {
@@ -115,7 +115,7 @@ app.post("/memory", upload.single("image"), async (req, res) => {
     });
 
     // 3. 이미지 변환 및 압축
-    console.log("3. 이미지 변환 및 압축")
+    // console.log("3. 이미지 변환 및 압축")
     let imageBuffer;
     if (type === "png" || type === "jpeg" || type === "jpg") {
       imageBuffer = req.file.buffer;
@@ -133,7 +133,7 @@ app.post("/memory", upload.single("image"), async (req, res) => {
       .toBuffer();
 
     // 4. S3 업로드
-    console.log("4. S3 업로드")
+    // console.log("4. S3 업로드")
     const uploadParams = {
       Bucket: process.env.NCLOUD_BUCKET_NAME,
       Key: fileName,
@@ -150,7 +150,7 @@ app.post("/memory", upload.single("image"), async (req, res) => {
     const imageUrl = `https://${process.env.NCLOUD_BUCKET_NAME}.kr.object.ncloudstorage.com/${fileName}`;
 
     // 5. 데이터베이스에 새로운 메모리 저장
-    console.log("5. 데이터베이스에 새로운 메모리 저장")
+    // console.log("5. 데이터베이스에 새로운 메모리 저장")
     const sql = "INSERT INTO memory (nickname, image_url, message, location, size) VALUES (?, ?, ?, ?, ?)";
     await new Promise((resolve, reject) => {
       db.query(sql, [nickname, imageUrl, message, location, size], (err) => {
@@ -285,13 +285,16 @@ app.get("/cloud-cleanup-summary", async(req, res) => {
 
 app.listen(app.get("port"), () => {
   // console.log(app.get("port"), "번 포트에서 대기 중");
-  schedule.scheduleJob('0 0 * * *', function() {
+  schedule.scheduleJob('0 0 0 * * *', function() {
+
     console.log('3일 전 데이터 삭제 작업 시작')
     
     // 3일 전 날짜 계산
     const threeDaysAgo = new Date();
+    console.log("threeDaysAgo: ", threeDaysAgo);
     threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
     const formattedDate = threeDaysAgo.toISOString().slice(0, 10);  // YYYY-MM-DD 형식으로 변환
+    console.log("formattedDate: ", formattedDate);
 
     // 3일 전 데이터 삭제 쿼리
     const query = `DELETE FROM memory WHERE created_at < ?`;
