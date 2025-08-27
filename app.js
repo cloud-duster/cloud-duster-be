@@ -6,6 +6,7 @@ import { CloudinaryStorage } from 'multer-storage-cloudinary';
 import express from "express";
 import mongoose from "mongoose";
 import Memory from "./models/Memory.js";
+import PhotoStats from "./models/PhotoStats.js";
 
 dotenv.config();
 
@@ -102,27 +103,56 @@ app.post("/upload", upload.single("image"), async (req, res) => {
 });
 
 // 추억 저장하기
-app.post("/memory", async (req, res) => {
+app.post("/memory", upload.single('image'), async (req, res) => {
   try {
-    const { nickname, image, text, location, size } = req.body;
+    if (!req.file) {
+      return res.status(400).json({ error: 'No image file provided' });
+    }
     
-    if (!nickname || !image || !text || !location || size === undefined) {
+    const { nickname, message, location, size, amount = 1 } = req.body;
+    
+    if (!message || !location || size === undefined) {
+      // Clean up the uploaded file if validation fails
+      if (req.file && req.file.path) {
+        await cloudinary.uploader.destroy(req.file.filename);
+      }
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
     if (!['MOUNTAIN', 'SEA', 'SKY'].includes(location)) {
+      // Clean up the uploaded file if validation fails
+      if (req.file && req.file.path) {
+        await cloudinary.uploader.destroy(req.file.filename);
+      }
       return res.status(400).json({ error: 'Invalid location. Must be one of: MOUNTAIN, SEA, SKY' });
     }
 
+    // Get the Cloudinary URL from the uploaded file
+    const imageUrl = req.file.path;
+
     const memory = new Memory({
-      nickname,
-      image_url: image,
-      message: text,
+      nickname: nickname || '익명의 먼지',
+      image_url: imageUrl,
+      message,
       location,
       size: Number(size)
     });
 
     await memory.save();
+    
+    // Update photo stats
+    try {
+      const stats = await PhotoStats.getStats();
+      stats.totalPhotoSize += Number(size);
+      stats.peopleCount = await Memory.distinct('nickname').countDocuments();
+      // Increment deletedPhotoCount by the provided amount
+      stats.deletedPhotoCount += Number(amount);
+      await stats.save();
+    } catch (statsError) {
+      console.error('Error updating photo stats:', statsError);
+      // Don't fail the request if stats update fails
+    }
+    
     res.status(201).json({ message: "Memory added" });
   } catch (error) {
     console.error('Error saving memory:', error);
@@ -178,6 +208,50 @@ app.get("/memories", async (req, res) => {
   } catch (error) {
     console.error('Error fetching memories:', error);
     res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// Get single memory by ID
+app.get('/memories/:id', async (req, res) => {
+  try {
+    const memory = await Memory.findById(req.params.id);
+    if (!memory) {
+      return res.status(404).json({ error: 'Memory not found' });
+    }
+    
+    res.status(200).json({
+      id: memory._id,
+      nickname: memory.nickname,
+      image_url: memory.image_url,
+      message: memory.message,
+      location: memory.location,
+      size: memory.size,
+      created_at: memory.createdAt
+    });
+  } catch (error) {
+    console.error('Error fetching memory:', error);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+
+// Get cloud cleanup summary
+app.get('/cloud-cleanup-summary', async (req, res) => {
+  try {
+    const stats = await PhotoStats.getStats();
+    
+    // Calculate average photo size
+    const avgPhotoSize = stats.totalPhotoSize > 0 ? 
+      stats.totalPhotoSize / (stats.deletedPhotoCount || 1) : 0;
+
+    res.status(200).json({
+      deletedPhotoCount: stats.deletedPhotoCount,
+      peopleCount: stats.peopleCount,
+      avgPhotoSize: parseFloat(avgPhotoSize.toFixed(2))
+    });
+  } catch (error) {
+    console.error('Error fetching cloud cleanup summary:', error);
+    res.status(500).json({ error: '서버 에러' });
   }
 });
 
