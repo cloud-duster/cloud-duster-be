@@ -255,6 +255,33 @@ app.get('/cloud-cleanup-summary', async (req, res) => {
   }
 });
 
+// Delete memories older than 3 days
+app.post('/batch/cleanup-old-memories', async (req, res) => {
+  try {
+    // Check Secret Key
+    const providedSecret = req.headers['x-batch-secret'];
+    if (providedSecret !== process.env.BATCH_JOB_SECRET) {
+      return res.status(401).json({ error: 'Unauthorized: Invalid secret key' });
+    }
+    
+    const threeDaysAgo = new Date();
+    threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+    
+    // Find and delete memories older than 3 days
+    const result = await Memory.deleteMany({
+      createdAt: { $lt: threeDaysAgo }
+    });
+    
+    res.status(200).json({
+      message: `Successfully deleted ${result.deletedCount} memories`,
+      deletedCount: result.deletedCount
+    });
+  } catch (error) {
+    console.error('Error in batch cleanup:', error);
+    res.status(500).json({ error: 'Batch cleanup failed' });
+  }
+});
+
 // 서버 시작
 app.listen(app.get("port"), () => {
   console.log(`✅ 서버가 ${app.get("port")}번 포트에서 실행 중입니다.`);
