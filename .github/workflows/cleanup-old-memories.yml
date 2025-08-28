@@ -28,7 +28,7 @@ jobs:
     
     - name: Run cleanup script
       run: |
-        NODE_ENV=production node -e "
+        NODE_ENV=production npx -y node -e "
           const axios = require('axios');
           const url = process.env.API_URL + '/batch/cleanup-old-memories';
           
