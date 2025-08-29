@@ -119,12 +119,12 @@ app.post("/memory", upload.single('image'), async (req, res) => {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    if (!['MOUNTAIN', 'SEA', 'SKY'].includes(location)) {
+    if (!['MOUNTAIN', 'OCEAN', 'SKY'].includes(location)) {
       // Clean up the uploaded file if validation fails
       if (req.file && req.file.path) {
         await cloudinary.uploader.destroy(req.file.filename);
       }
-      return res.status(400).json({ error: 'Invalid location. Must be one of: MOUNTAIN, SEA, SKY' });
+      return res.status(400).json({ error: 'Invalid location. Must be one of: MOUNTAIN, OCEAN, SKY' });
     }
 
     // Get the Cloudinary URL from the uploaded file
