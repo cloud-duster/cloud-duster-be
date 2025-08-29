@@ -143,7 +143,7 @@ app.post("/memory", upload.single('image'), async (req, res) => {
     // Update photo stats
     try {
       const stats = await PhotoStats.getStats();
-      stats.totalPhotoSize += Number(size);
+      stats.totalPhotoSize += Number(size) * Number(amount);
       stats.peopleCount = await Memory.distinct('nickname').countDocuments();
       // Increment deletedPhotoCount by the provided amount
       stats.deletedPhotoCount += Number(amount);
@@ -247,7 +247,8 @@ app.get('/cloud-cleanup-summary', async (req, res) => {
     res.status(200).json({
       deletedPhotoCount: stats.deletedPhotoCount,
       peopleCount: stats.peopleCount,
-      avgPhotoSize: parseFloat(avgPhotoSize.toFixed(2))
+      avgPhotoSize: parseFloat(avgPhotoSize.toFixed(2)),
+      totalPhotoSize: stats.totalPhotoSize
     });
   } catch (error) {
     console.error('Error fetching cloud cleanup summary:', error);
