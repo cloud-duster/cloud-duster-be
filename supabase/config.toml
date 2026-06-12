@@ -1,0 +1,22 @@
+# Local project ref (any slug). The remote project is bound via `supabase link`.
+project_id = "cloud-duster"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "storage", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+major_version = 15
+
+[storage]
+enabled = true
+file_size_limit = "10MiB"
+
+# Public API function: callable without a JWT/apikey (matches the old open
+# Express endpoints). The /batch route is still protected by x-batch-secret.
+[functions.api]
+verify_jwt = false
