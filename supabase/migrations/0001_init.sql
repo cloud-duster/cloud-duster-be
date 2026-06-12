@@ -2,11 +2,14 @@
 -- All application access goes through the `api` Edge Function using the
 -- service_role key, so RLS is enabled with no public policies (deny direct
 -- anon/PostgREST access) while the functions bypass RLS.
+--
+-- Table and column names mirror exactly what the `api` Edge Function queries
+-- (memory / cloud_cleanup_summary), so the schema and the function stay in sync.
 
 -- ---------------------------------------------------------------------------
--- memories
+-- memory
 -- ---------------------------------------------------------------------------
-create table if not exists public.memories (
+create table if not exists public.memory (
   id          bigint generated always as identity primary key,
   nickname    text        not null default '익명의 먼지',
   image_url   text        not null,
@@ -18,27 +21,27 @@ create table if not exists public.memories (
 
 -- Keyset pagination order: newest first. id is monotonic with created_at,
 -- so (created_at desc, id desc) collapses to (id desc).
-create index if not exists memories_created_at_id_idx
-  on public.memories (created_at desc, id desc);
+create index if not exists memory_created_at_id_idx
+  on public.memory (created_at desc, id desc);
 
-alter table public.memories enable row level security;
+alter table public.memory enable row level security;
 -- No policies on purpose: only service_role (Edge Functions) may touch rows.
 
 -- ---------------------------------------------------------------------------
--- photo_stats (singleton row)
+-- cloud_cleanup_summary (singleton row, id = 1)
 -- ---------------------------------------------------------------------------
-create table if not exists public.photo_stats (
-  id                  boolean primary key default true,
-  deleted_photo_count bigint  not null default 0,
-  people_count        bigint  not null default 0,
-  total_photo_size    bigint  not null default 0,
-  constraint photo_stats_singleton check (id)
+create table if not exists public.cloud_cleanup_summary (
+  id                   bigint primary key default 1,
+  photos_deleted_count bigint not null default 0,
+  people_involved_count bigint not null default 0,
+  total_photo_size     bigint not null default 0,
+  constraint cloud_cleanup_summary_singleton check (id = 1)
 );
 
-insert into public.photo_stats (id) values (true)
+insert into public.cloud_cleanup_summary (id) values (1)
   on conflict (id) do nothing;
 
-alter table public.photo_stats enable row level security;
+alter table public.cloud_cleanup_summary enable row level security;
 
 -- ---------------------------------------------------------------------------
 -- Storage bucket for memory images (public read so <img> URLs resolve)
@@ -65,5 +68,5 @@ end $$;
 select cron.schedule(
   'cleanup-old-memories',
   '0 0 * * *',
-  $$ delete from public.memories where created_at < now() - interval '3 days' $$
+  $$ delete from public.memory where created_at < now() - interval '3 days' $$
 );

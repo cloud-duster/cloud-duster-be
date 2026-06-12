@@ -69,15 +69,17 @@ Deno.serve(async (req) => {
       const message = (form.get("message") as string) ?? null;
       const location = (form.get("location") as string) ?? null;
       const size = Number(form.get("size") ?? 0);
+      // Number of photos the user deleted (frontend sends this as `amount`).
+      const amount = Number(form.get("amount") ?? 0);
 
       if (location && !VALID_LOCATIONS.includes(location)) {
         return json({ msg: "Invalid location" }, 400);
       }
 
-      // Bump the running totals (develop: +1 person, += size, per post).
+      // Bump the running totals: +1 person, += size, += deleted-photo count.
       const { data: summary } = await supabase
         .from("cloud_cleanup_summary")
-        .select("people_involved_count, total_photo_size")
+        .select("people_involved_count, total_photo_size, photos_deleted_count")
         .eq("id", 1)
         .single();
       if (summary) {
@@ -86,6 +88,8 @@ Deno.serve(async (req) => {
           .update({
             people_involved_count: Number(summary.people_involved_count) + 1,
             total_photo_size: Number(summary.total_photo_size) + size,
+            photos_deleted_count:
+              Number(summary.photos_deleted_count) + amount,
           })
           .eq("id", 1);
       }
@@ -152,31 +156,6 @@ Deno.serve(async (req) => {
         : null;
 
       return json({ items: rows, nextCursor });
-    }
-
-    // POST /update-photos-deleted-total — accumulate deleted-photo count
-    if (req.method === "POST" && path === "/update-photos-deleted-total") {
-      const body = await req.json().catch(() => ({}));
-      const count = Number(body.count ?? 0);
-
-      const { data: summary, error: getErr } = await supabase
-        .from("cloud_cleanup_summary")
-        .select("photos_deleted_count")
-        .eq("id", 1)
-        .single();
-      if (getErr) throw getErr;
-
-      const totalPhotosDeleted = Number(summary.photos_deleted_count) + count;
-      const { error: updErr } = await supabase
-        .from("cloud_cleanup_summary")
-        .update({ photos_deleted_count: totalPhotosDeleted })
-        .eq("id", 1);
-      if (updErr) throw updErr;
-
-      return json({
-        message: "누적된 photos_deleted_count 저장 완료",
-        totalPhotosDeleted,
-      });
     }
 
     // GET /cloud-cleanup-summary — computed stats
