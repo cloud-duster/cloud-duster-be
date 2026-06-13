@@ -11,7 +11,7 @@
 -- ---------------------------------------------------------------------------
 create table if not exists public.memory (
   id          bigint generated always as identity primary key,
-  nickname    text        not null default '익명의 먼지',
+  nickname    text        not null default 'Anonymous Dust',
   image_url   text        not null,
   message     text        not null,
   location    text        not null check (location in ('MOUNTAIN', 'OCEAN', 'SKY')),
